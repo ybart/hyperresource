@@ -8,6 +8,7 @@ require 'hyper_resource/version'
 
 require 'hyper_resource/adapter'
 require 'hyper_resource/adapter/hal_json'
+require 'hyper_resource/adapter/json_api'
 
 require 'hyper_resource/modules/http'
 require 'hyper_resource/modules/internal_attributes'
