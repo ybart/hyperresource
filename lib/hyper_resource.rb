@@ -199,6 +199,7 @@ public
                    :auth            => self.auth,
                    :headers         => self.headers,
                    :namespace       => self.namespace,
+                   :adapter         => self.adapter,
                    :faraday_options => self.faraday_options,
                    :href            => href)
   end

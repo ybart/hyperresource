@@ -44,9 +44,10 @@ class HyperResource
           end
 
           def parse
+            build_meta_attributes
             build_top_documents
             build_linked_documents
-            build_links @resource # Top-Level links
+            build_links @resource, true
             build_document_links  # Needs both top and linked documents to be built.
             @resource.loaded = true
           end
@@ -63,13 +64,14 @@ class HyperResource
             resource = @klass.new(
               :root => @resource.root,
               :headers => @resource.headers,
-              :namespace => @resource.namespace
+              :namespace => @resource.namespace,
             )
-            resource.attributes['_type'] = type
-            resource.body = object
+            # puts "Setting _type to #{type} (resource: #{object})"
+            # resource.attributes['_type'] = type
+            resource.body = object.merge('_type' => type)
             resource.loaded = true
 
-            build_attributes(resource, object)
+            build_attributes(resource)
             resource
           end
 
@@ -82,6 +84,11 @@ class HyperResource
             end
 
             objects._hr_create_methods!
+          end
+
+          def build_meta_attributes
+            return unless @response['meta']
+            build_attributes(@resource, @response['meta'])
           end
 
           def build_linked_documents
@@ -97,7 +104,7 @@ class HyperResource
             objects._hr_create_methods!
           end
 
-          def build_links resource
+          def build_links resource, strings_are_href=false
             return unless resource.body['links']
             links = resource.links = resource._hr_response_class::Links.new(resource)
 
@@ -106,6 +113,8 @@ class HyperResource
                 links[name] = build_spec(resource, name, link_spec)
               elsif link_spec.is_a? Array
                 links[name] = build_specs(resource, name, link_spec)
+              elsif strings_are_href
+                links[name] = resource.class::Link.new(resource, { 'name' => name, 'href' => link_spec, 'templated' => true })
               else # Assumes it's an identifier
                 links[name] = build_spec(resource, name, link_spec)
               end
@@ -115,6 +124,8 @@ class HyperResource
           end
           
           def build_document_links
+            return unless @resource.objects
+            
             @resource.objects.each do |name, resources|
               resources.each { |resource| build_links resource }
             end
@@ -126,6 +137,7 @@ class HyperResource
             end
           end
           
+          # TODO Refactor
           def build_spec parent, name, link_spec
             if link_spec.is_a? Hash
               link_spec['name'] = name
@@ -134,19 +146,43 @@ class HyperResource
               parent.class::Link.new(parent, link_spec)
             else
               type = infer_type parent, name
-              resource = @resource.objects[type].find { |r| r.attributes['id'] == link_spec }
-              parent.objects[name] ||= []
-              parent.objects[name] << resource
+              
+              # Look for embedded objects
+              if @resource.objects[type]
+                resource = @resource.objects[type].find { |r| r.attributes['id'] == link_spec }
+                parent.objects[name] ||= []
+                parent.objects[name] << resource
+                #puts "DEBUG: Embedding #{resource._type}(#{resource.id}) in #{parent._type}(#{parent.id}).#{name}"
+              else
+                # When there is no embedded object, build the link
+                # TODO: Expand id lists to multiple links
+                href = @response['links'][type]
+                template = URITemplate.new(href)
+                parameters = {}
+                template.variables.each do |variable|
+                  key = variable.split('.').last
+                  value = parent.body[key] || parent.body['links'][key] rescue nil
+                  value = value.join(',') if value.is_a? Array
+                  parameters[variable] = value
+                end
+                spec = {
+                  'href' => href,
+                  'templated' => true, 
+                  'params' => parameters
+                }
+                parent.class::Link.new(parent, spec)
+              end
             end
           end
 
           def infer_type parent, name
-            links = @response['links']
-            type = (links["#{parent.attributes['_type']}.#{name}"] || links[name]) rescue nil
-            type ||= name.pluralize rescue name
+            full_type = "#{parent.attributes['_type']}.#{name}"
+            return name if @resource.objects.keys.include?(name)
+            return full_type if @resource.links.keys.include?(full_type)
+            name.pluralize rescue name
           end
 
-          def build_attributes(resource, object)
+          def build_attributes(resource, object=resource.body)
             resource.attributes = resource._hr_response_class::Attributes.new(resource)
 
             given_attrs = object.reject{|k,_| k == 'links'}

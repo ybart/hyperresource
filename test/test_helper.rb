@@ -53,7 +53,7 @@ JSON_API_BODY = {
   "links" => {
     "baskets" => { "href" => "/baskets" },
     "baskets.consumers" => { "href" => "/baskets/{baskets.id}/consumers" },
-    "baskets.refills" => { "href" => "/baskets/{baskets.id}/refills" },
+    "baskets.refills" => "/baskets/{baskets.id}/refills",
   },
   "linked" => {
     "fruits" => [

@@ -188,5 +188,43 @@ class LiveTestServer < Sinatra::Base
       EOT
     end
   end
+
+
+  get '/json-api/' do
+    headers['Content-type'] = 'application/vnd.api+json;type=Root'
+    <<-EOT
+      {
+        "meta" : {
+          "name" : "Fruits Basket API"
+        },
+        "links": {
+          "baskets": { "href" : "/json-api/baskets" }
+        }
+      }
+    EOT
+  end
+
+  get '/json-api/baskets' do
+    headers['Content-type'] = 'application/vnd.api+json;type=BasketSet'
+    <<-EOT
+      { 
+        "meta" : { "name": "My Baskets" },
+        "links": {
+          "baskets": "/json-api/baskets/{baskets.id}",
+          "baskets.fruits": "/json-api/baskets/{baskets.id}/fruits/{baskets.fruits}"
+        },
+        "baskets": [
+          { 
+            "id": "1",
+            "name": "Basket 1",
+            "links": {
+              "fruits": ["1", "2", "3"]
+            }
+          }
+        ]
+      }
+    EOT
+  end
+
 end
 
