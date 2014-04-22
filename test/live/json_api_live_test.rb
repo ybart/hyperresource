@@ -56,6 +56,18 @@ unless !!ENV['NO_LIVE']
           baskets.must_be_instance_of WhateverJSONAPI::BasketSet
         end
 
+        it 'follows links twice' do
+          root = @api.get
+          root.links.must_respond_to :baskets
+          baskets = root.baskets.get
+          fruits = baskets.first.fruits
+          fruits.must_be_kind_of HyperResource::Link
+          # TODO: fruits.get.first.id must_equal 1
+          fruits.get.fruits.first.id.must_equal HyperResource
+          baskets.must_be_kind_of HyperResource
+          baskets.must_be_instance_of WhateverJSONAPI::BasketSet
+        end
+
         it 'observes proper classing' do
           root = @api.get
           root.must_be_instance_of WhateverJSONAPI::Root

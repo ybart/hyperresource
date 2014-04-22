@@ -110,13 +110,13 @@ class HyperResource
 
             resource.body['links'].each do |name, link_spec|
               if link_spec.is_a? Hash
-                links[name] = build_spec(resource, name, link_spec)
+                links[name] = build_spec_from_hash(resource, name, link_spec)
               elsif link_spec.is_a? Array
                 links[name] = build_specs(resource, name, link_spec)
               elsif strings_are_href
                 links[name] = resource.class::Link.new(resource, { 'name' => name, 'href' => link_spec, 'templated' => true })
               else # Assumes it's an identifier
-                links[name] = build_spec(resource, name, link_spec)
+                links[name] = build_spec_from_id(resource, name, link_spec)
               end
             end
 
@@ -133,46 +133,58 @@ class HyperResource
           
           def build_specs parent, name, link_specs
             link_specs.map do |spec|
-              build_spec parent, name, spec
+              if spec.is_a? Hash
+                build_spec_from_hash parent, name, spec
+              else
+                type = infer_type parent, name
+
+                # Look for embedded objects
+                if @resource.objects[type]
+                  build_spec_from_id parent, name, spec, type
+                else
+                  return build_link_for_type parent, type
+                end
+              end
             end
           end
           
-          # TODO Refactor
-          def build_spec parent, name, link_spec
-            if link_spec.is_a? Hash
-              link_spec['name'] = name
-              link_spec['href'] ||= build_hrefs(name, link_spec)
-              link_spec['templated'] = true
-              parent.class::Link.new(parent, link_spec)
+          def build_spec_from_id(parent, name, link_spec, type = infer_type(parent, name))
+            # Look for embedded objects
+            if @resource.objects[type]
+              resource = @resource.objects[type].find { |r| r.attributes['id'] == link_spec }
+              parent.objects[name] ||= []
+              parent.objects[name] << resource
             else
-              type = infer_type parent, name
-              
-              # Look for embedded objects
-              if @resource.objects[type]
-                resource = @resource.objects[type].find { |r| r.attributes['id'] == link_spec }
-                parent.objects[name] ||= []
-                parent.objects[name] << resource
-                #puts "DEBUG: Embedding #{resource._type}(#{resource.id}) in #{parent._type}(#{parent.id}).#{name}"
-              else
-                # When there is no embedded object, build the link
-                # TODO: Expand id lists to multiple links
-                href = @response['links'][type]
-                template = URITemplate.new(href)
-                parameters = {}
-                template.variables.each do |variable|
-                  key = variable.split('.').last
-                  value = parent.body[key] || parent.body['links'][key] rescue nil
-                  value = value.join(',') if value.is_a? Array
-                  parameters[variable] = value
-                end
-                spec = {
-                  'href' => href,
-                  'templated' => true, 
-                  'params' => parameters
-                }
-                parent.class::Link.new(parent, spec)
-              end
+              build_link_for_type parent, type
             end
+          end
+          
+          def build_spec_from_hash parent, name, link_spec
+            link_spec['name'] = name
+            link_spec['href'] ||= build_hrefs(name, link_spec)
+            link_spec['templated'] = true
+            parent.class::Link.new(parent, link_spec)
+          end
+          
+          def build_link_for_type parent, type
+            href = @response['links'][type]
+            template = URITemplate.new(href)
+            parameters = {}
+            
+            template.variables.each do |variable|
+              key = variable.split('.').last
+              value = parent.body[key] || parent.body['links'][key] rescue nil
+              value = value.join(',') if value.is_a? Array
+              parameters[variable] = value
+            end
+            
+            spec = {
+              'href' => href,
+              'templated' => true, 
+              'params' => parameters
+            }
+            
+            parent.class::Link.new(parent, spec)
           end
 
           def infer_type parent, name

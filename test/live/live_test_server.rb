@@ -204,6 +204,19 @@ class LiveTestServer < Sinatra::Base
     EOT
   end
 
+  get '/json-api/baskets/1/fruits/1,2,3' do
+    headers['Content-type'] = 'application/vnd.api+json'
+    <<-EOT
+      {
+        "fruits" : [
+          { "id" : 1 },
+          { "id" : 2 },
+          { "id" : 3 }
+        ]
+      }
+    EOT
+  end
+
   get '/json-api/baskets' do
     headers['Content-type'] = 'application/vnd.api+json;type=BasketSet'
     <<-EOT
