@@ -122,15 +122,15 @@ class HyperResource
 
             links._hr_create_methods!
           end
-          
+
           def build_document_links
             return unless @resource.objects
-            
+
             @resource.objects.each do |name, resources|
               resources.each { |resource| build_links resource }
             end
           end
-          
+
           def build_specs parent, name, link_specs
             link_specs.map do |spec|
               if spec.is_a? Hash
@@ -147,7 +147,7 @@ class HyperResource
               end
             end
           end
-          
+
           def build_spec_from_id(parent, name, link_spec, type = infer_type(parent, name))
             # Look for embedded objects
             if @resource.objects[type]
@@ -159,32 +159,32 @@ class HyperResource
               build_link_for_type parent, type
             end
           end
-          
+
           def build_spec_from_hash parent, name, link_spec
             link_spec['name'] = name
             link_spec['href'] ||= build_hrefs(name, link_spec)
             link_spec['templated'] = true
             parent.class::Link.new(parent, link_spec)
           end
-          
+
           def build_link_for_type parent, type
             href = @response['links'][type]
             template = URITemplate.new(href)
             parameters = {}
-            
+
             template.variables.each do |variable|
               key = variable.split('.').last
               value = parent.body[key] || parent.body['links'][key] rescue nil
               value = value.join(',') if value.is_a? Array
               parameters[variable] = value
             end
-            
+
             spec = {
               'href' => href,
-              'templated' => true, 
+              'templated' => true,
               'params' => parameters
             }
-            
+
             parent.class::Link.new(parent, spec)
           end
 
@@ -204,7 +204,7 @@ class HyperResource
             filtered_attrs.keys.each do |attr|
               resource.attributes[attr] = filtered_attrs[attr]
             end
-            
+
             resource.attributes._hr_clear_changed
             resource.attributes._hr_create_methods!
           end
