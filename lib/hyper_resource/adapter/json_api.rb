@@ -154,6 +154,7 @@ class HyperResource
               resource = @resource.objects[type].find { |r| r.attributes['id'] == link_spec }
               parent.objects[name] ||= []
               parent.objects[name] << resource
+              resource
             else
               build_link_for_type parent, type
             end
